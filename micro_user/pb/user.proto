@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package pb;
+import "google/protobuf/empty.proto";
+
+option go_package = "micro_user/pb";
+
+service UserService {
+  rpc Signup(SignupRequest) returns(SignupResponse);
+  rpc Signin(SigninRequest) returns(SigninResponse);
+  rpc GetProfile(google.protobuf.Empty) returns (UserInfo);
+}
+
+
+message SignupRequest {
+  string Password = 1;
+  string Username = 2;
+}
+message SigninRequest {
+  string Password = 1;
+  string Username = 2;
+}
+
+// message PostRequest {
+//     string title = 1;
+//     string content = 2;
+// }
+
+message SignupResponse {
+  int64 User_id = 1;   
+}
+
+message SigninResponse {
+  string Token = 1;
+  int64 User_id = 2;
+}
+
+// message PostResponse{
+//   int64 post_id = 1;
+// }
+
+message UserInfo{
+  string user_id = 1;
+  string username = 2;
+}
