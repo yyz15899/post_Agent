@@ -74,8 +74,31 @@ func (p *AgentHandler) AgentChat(c *gin.Context) {
 		Role:    schema.User,
 		Content: i.Message,
 	}
-	answer, err := service.AgentChat(ctx, req, p.retriever)
+
+	// 定义回调函数
+	onChunk := func(content string) error {
+		if err := ctx.Err(); err != nil { // 这里用 父ctx 错误时 只有可能是客户端断开连接
+			return err
+		}
+		c.SSEvent("chunk", content)
+		c.Writer.Flush()
+		return nil
+	}
+
+	err = service.AgentChat(ctx, req, p.retriever, onChunk)
 	if err != nil {
+		log.Printf("AgentChat failed: %v", err)
+
+		if c.Request.Context().Err() != nil {
+			return // 请求已经取消，不再发送
+		}
+		if c.Writer.Written() { // 用于判断当前 HTTP 响应是否已经开始向客户端写入（或已经发送）,这里表示客户端开始响应
+			// True表示继续执行
+			c.SSEvent("error", "回答中断，请稍后重试") // 当内部发生异常中断时发送一条这样的错误提示
+			c.Writer.Flush()                 // 强制将缓冲区的数据刷给客户端（确保前端能立刻收到这条错误消息，而不是卡在缓冲区）
+			return
+		}
+		// 客户端还没有响应时
 		switch {
 		case errors.Is(err, service.MessageEmpty):
 			log.Printf("输入信息为空")
@@ -85,10 +108,28 @@ func (p *AgentHandler) AgentChat(c *gin.Context) {
 		default:
 			log.Printf("AgentChat failed,err:%v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"msg": "服务暂时不可用"})
+
+			return
 		}
-		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"resp": answer.Content,
-	})
 }
+
+// func (p *AgentHandler) TestStream(c *gin.Context) {
+// 	c.Header("Content-Type", "text/event-stream")
+// 	c.Header("Cache-Control", "no-cache")
+
+// 	parts := []string{"第一段:哈哈哈", "第二段:嘻嘻"}
+// 	index := 0
+
+// 	c.Stream(func(w io.Writer) bool {
+// 		if index >= len(parts) {
+// 			return false // 返回false就停止
+// 		}
+// 		if index > 0 {
+// 			time.Sleep(time.Second)
+// 		}
+// 		c.SSEvent("chunk", parts[index])
+// 		index++
+// 		return true // 返回true就继续调用
+// 	})
+// }
