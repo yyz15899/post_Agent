@@ -26,6 +26,7 @@ func RunPostSyncWorker(ctx context.Context, indexer *milvusIndexer.Indexer) {
 			}
 			for _, task := range Tasks {
 				err := ProcessPostSyncTask(ctx, indexer, task)
+				// 要等到同步失败且重试时间成功更新后，任务要等到 re_time 到期(30s)才会执行,不然不满足listendue...的db的where条件
 				if err != nil {
 					log.Printf("任务 %d 同步失败：%v", task.TaskID, err)
 					continue

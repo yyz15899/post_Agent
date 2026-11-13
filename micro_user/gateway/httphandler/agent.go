@@ -85,7 +85,7 @@ func (p *AgentHandler) AgentChat(c *gin.Context) {
 		return nil
 	}
 
-	err = service.AgentChat(ctx, req, p.retriever, onChunk)
+	postsources, err := service.AgentChat(ctx, req, p.retriever, onChunk)
 	if err != nil {
 		log.Printf("AgentChat failed: %v", err)
 
@@ -98,20 +98,25 @@ func (p *AgentHandler) AgentChat(c *gin.Context) {
 			c.Writer.Flush()                 // 强制将缓冲区的数据刷给客户端（确保前端能立刻收到这条错误消息，而不是卡在缓冲区）
 			return
 		}
+
 		// 客户端还没有响应时
 		switch {
 		case errors.Is(err, service.MessageEmpty):
 			log.Printf("输入信息为空")
 			c.JSON(http.StatusBadRequest, gin.H{"msg": "问题不能为空"})
+			return
 		case errors.Is(err, context.DeadlineExceeded): // 会检测%w封装的内层错误
 			c.JSON(http.StatusGatewayTimeout, gin.H{"msg": "模型响应超时，请稍后重试"})
+			return
 		default:
 			log.Printf("AgentChat failed,err:%v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"msg": "服务暂时不可用"})
-
 			return
 		}
 	}
+	c.SSEvent("source", postsources)
+	c.Writer.Flush()
+
 }
 
 // func (p *AgentHandler) TestStream(c *gin.Context) {

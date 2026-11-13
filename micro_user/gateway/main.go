@@ -28,6 +28,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer con.Close() // 在下面匿名goroutine执行结束后执行
+	// 创建grpc client
 	cli := pb.NewUserServiceClient(con)
 	// 创建milvus client
 	mil_cli, err := rag.NewMilvusClient(context.Background())
@@ -79,5 +80,8 @@ func main() {
 	r.GET("/api/posts", postHandler.SearchPosts)
 
 	r.POST("/api/agent/chat", agentHandler.AgentChat)
+
+	// r.GET("api/agent/test", agentHandler.TestStream)
+
 	r.Run(":8081")
 }

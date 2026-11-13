@@ -48,17 +48,3 @@ func Chat(ctx context.Context, messages []*schema.Message, tools []*schema.ToolI
 	return resp, nil
 	// return resp, nil
 }
-
-// 一个不接收toolinfo的model调用(message中仍含有toolinfo,因为没有了withtool())
-func ChatResp(ctx context.Context, messages []*schema.Message) (*schema.StreamReader[*schema.Message], error) {
-	chatmodel, err := NewChatModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := chatmodel.Stream(ctx, messages)
-	if err != nil {
-		log.Printf("模型调用失败,%v", err)
-		return nil, err
-	}
-	return resp, nil
-}

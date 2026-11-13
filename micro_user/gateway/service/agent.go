@@ -6,12 +6,19 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"micro_user/gateway/dao"
 	"micro_user/gateway/llm"
+	Model "micro_user/gateway/model"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	milvusRetriever "github.com/cloudwego/eino-ext/components/retriever/milvus2"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
+	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -19,13 +26,119 @@ type SearchPostsRequest struct {
 	Keyword string `json:"keyword" jsonschema:"required"`
 }
 
+type GetPostRequest struct {
+	Postid int64 `json:"post_id"`
+}
+type GetPostResult struct {
+	Found bool
+	Post  *Model.Post
+}
+
+type PostSource struct {
+	Postid any `json:"post_id"`
+	Title  any `json:"title"`
+}
+
+// 封装react.agent函数
+func NewReActAgent(ctx context.Context, config *react.AgentConfig) (_ *react.Agent, err error) {
+	agent, err := react.NewAgent(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	return agent, nil
+}
+
 // 接收用户完整信息,交给model拿到message(包含user,tool,assistant)
-func AgentChat(ctx context.Context, message *schema.Message, r *milvusRetriever.Retriever, onChunk func(string) error) error {
-	var maxRounds = 3
+func AgentChat(ctx context.Context, message *schema.Message, r *milvusRetriever.Retriever, onChunk func(string) error) ([]PostSource, error) {
+	var Mutex sync.Mutex
+	model, err := llm.NewChatModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 回调函数		ondocs和onpost分别拿到数据库的数据和milvus中检索出的数据
+	sources := []PostSource{}         // 存储来源信息
+	seen := make(map[string]struct{}) // 用于去重
+
+	onDocs := func(docs []*schema.Document) {
+		Mutex.Lock()
+		defer Mutex.Unlock()
+		for _, doc := range docs { // 拿到milvus中查出的语义相近的doc  并去重后加入source
+			_, exists := seen[doc.ID]
+			if exists { // true 表示已存在
+				continue // 退出这次循环,进行一下次
+			}
+			// 不存在(第一次需要追加到source)
+			seen[doc.ID] = struct{}{}
+			sources = append(sources, PostSource{Postid: doc.MetaData["post_id"], Title: doc.MetaData["title"]})
+			log.Printf("检索来源 post_id=%v title=%v",
+				doc.MetaData["post_id"], doc.MetaData["title"])
+		}
+	}
+
+	onPost := func(post *Model.Post) {
+		Mutex.Lock()
+		defer Mutex.Unlock()
+		key := "post_" + strconv.FormatInt(post.Id, 10)
+		log.Printf("检索到:%v", key)
+		_, exists := seen[key] // 检测key是否在seen中
+		if exists {
+			return
+		}
+		seen[key] = struct{}{}
+		sources = append(sources, PostSource{Postid: post.Id, Title: post.Title})
+
+	}
+
+	ToolInfo1 := NewSearchPostTool(r, onDocs)
+	ToolInfo2 := NewGetPostTool(r, onPost)
+
+	cfg := &react.AgentConfig{
+		ToolCallingModel: model,
+		ToolsConfig: compose.ToolsNodeConfig{
+			Tools: []tool.BaseTool{ToolInfo1, ToolInfo2},
+		},
+		StreamToolCallChecker: func(ctx context.Context, modelOutput *schema.StreamReader[*schema.Message]) (bool, error) {
+			defer modelOutput.Close()
+			// TODO  这里如果用户问的是  "你好" 等不需要调用tool func 的问题 则必须等待model的流式信息全部收集完才会指向END
+			for {
+				chunk, err := modelOutput.Recv()
+				if errors.Is(err, io.EOF) {
+					log.Printf("checker EOF: %s", time.Now().Format("15:04:05.000"))
+					return false, nil
+				}
+				if err != nil {
+					return false, err
+				}
+				log.Printf("checker收到分片:时间:%v,内容长度:%v,工具调用数:%v,内容:%v", time.Now(), len(chunk.Content), len(chunk.ToolCalls), chunk.Content)
+
+				if len(chunk.ToolCalls) != 0 {
+					return true, nil // 继续指向工具节点,执行tool func
+				}
+				if chunk.Content != "" {
+					if err := onChunk(chunk.Content); err != nil {
+						return false, err
+					}
+				}
+				// 当模型先输出正文后输出toolcalls时,换成下述
+				// if chunk.Content != "" { // 遇到正文就返回(firstLineOfDefence) 这里需要确保是先返回toolcalls 后返回正文
+				// 	return false, nil // 引流直接返回给用户
+				// }
+
+			}
+
+		},
+	}
+	// 拿到post出处(post_id)
+	agent, err := NewReActAgent(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	content := strings.TrimSpace(message.Content)
 	if content == "" {
 		log.Printf("请输入查询内容")
-		return MessageEmpty
+		return nil, MessageEmpty
 	}
 	//将用户单条信息组织为切片
 	msg := []*schema.Message{
@@ -37,93 +150,37 @@ func AgentChat(ctx context.Context, message *schema.Message, r *milvusRetriever.
 			Content: message.Content,
 		},
 	}
-
-	resp_tool := NewSearchPostTool(r)
-	tool_info, err := resp_tool.Info(ctx)
+	// agent_msg, err := agent.Generate(ctx, msg)
+	stream_msg, err := agent.Stream(ctx, msg) // 此时模型生成keyword和postid
+	// stream_msg为模型最终返回的信息 Role=Assistant
 	if err != nil {
-		log.Printf("获取tool_info失败:%v", err)
-		return err
+		return nil, err
 	}
-	for round := 0; round < maxRounds; round++ { // 最多循环4轮
-		stream_resp, err := llm.Chat(ctx, msg, []*schema.ToolInfo{tool_info})
+	defer stream_msg.Close()
+
+	for {
+		_, err := stream_msg.Recv()
+		if errors.Is(err, io.EOF) {
+			fmt.Printf("接收完了信息")
+			break
+		}
 		if err != nil {
-			log.Printf("model 调用失败:%v", err)
-			return err
-		}
-		MSG := []*schema.Message{}   // 接收流式输出的信息,包含toolcalls等
-		var resp_msg *schema.Message //
-		// 接收流式消息
-		for {
-			chunk, err := stream_resp.Recv()
-			if errors.Is(err, io.EOF) {
-				stream_resp.Close() // 关闭流
-				log.Printf("信息接收完了")
-				resp_msg, err = schema.ConcatMessages(MSG) // 和并流式输出结果成一个完整Messages
-				if err != nil {
-					log.Printf("合并失败:%v", err)
-					return err
-				}
-				break
-			}
-			if err != nil {
-				stream_resp.Close()
-				return err
-			}
-			fmt.Printf("content:%v,长度为:%v", chunk.Content, len(chunk.ToolCalls))
-			MSG = append(MSG, chunk)
-			if chunk.Content != "" {
-				err = onChunk(chunk.Content) // 将流式输出的内容(chunk)传给客户端
-				if err != nil {
-					stream_resp.Close()
-					return err
-				}
-				continue
-			}
-
-		}
-
-		// TODO:判断toocalls调用是否已经输出
-
-		// 将流式信息合成一段完整信息
-		// 它会读完并关闭流，同时合并文字和工具调用片段
-		// resp_msg, err := schema.ConcatMessageStream(stream_resp)
-		// if err != nil {
-		// 	return nil, err
-		// }
-
-		// 模型没有选择调用tool 直接退出函数
-		if len(resp_msg.ToolCalls) == 0 {
-			return nil
-		}
-		msg = append(msg, resp_msg) // 调用tool时  继续追加msg调用msg
-		for _, tool := range resp_msg.ToolCalls {
-			// 封装为Eion-Tool
-			if tool.Function.Name == "search_posts" {
-				result, err := resp_tool.InvokableRun(ctx, tool.Function.Arguments) // 拿到包含post的string
-				if err != nil {
-					log.Printf("invokable failed:%v", err)
-					return err
-				}
-				// 打印调用工具
-				log.Printf("调用工具名:%v,参数:%v,result:%v", tool.Function.Name, tool.Function.Arguments, result)
-				msg = append(msg, &schema.Message{
-					Role:       schema.Tool,
-					Content:    result,
-					ToolCallID: tool.ID,
-				})
-			} else {
-				return fmt.Errorf("暂不支持的工具:%s", tool.Function.Name)
-			}
+			return nil, err
 		}
 	}
-	return fmt.Errorf("达到最大模型调用轮次 %d，仍未获得最终回答", maxRounds)
-
+	return sources, nil
 }
 
-// 封装searchpost工具的创建
-func NewSearchPostTool(r *milvusRetriever.Retriever) tool.InvokableTool {
+// 根据用户帖子找到相近语义的数据
+func NewSearchPostTool(r *milvusRetriever.Retriever, onDocs func([]*schema.Document)) tool.InvokableTool {
 	handler := func(ctx context.Context, req *SearchPostsRequest) ([]*schema.Document, error) {
-		return r.Retrieve(ctx, req.Keyword)
+		log.Printf("执行 search_posts，keyword=%q", req.Keyword)
+		docs, err := r.Retrieve(ctx, req.Keyword)
+		if err != nil {
+			return nil, err
+		}
+		onDocs(docs)
+		return docs, err
 	} // 将与keyword语义相近的post从milvus中拿出(document形式)
 	tool := utils.NewTool(&schema.ToolInfo{
 		Name: "search_posts",
@@ -135,5 +192,34 @@ func NewSearchPostTool(r *milvusRetriever.Retriever) tool.InvokableTool {
 			},
 		}),
 	}, handler) // 这里绑定调用invokable时的执行函数(参数形式需匹配)
+
+	return tool
+}
+
+// get_post_detail
+// 根据用户询问的postid查看对应post内容
+func NewGetPostTool(r *milvusRetriever.Retriever, onPost func(*Model.Post)) tool.InvokableTool {
+	handler := func(ctx context.Context, req *GetPostRequest) (*GetPostResult, error) {
+		log.Printf("执行 get_post，post_id=%d", req.Postid)
+		post, err := dao.GetPostByID(ctx, req.Postid)
+		if errors.Is(err, dao.ErrPostNotExist) {
+			return &GetPostResult{Found: false}, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		onPost(post)
+		return &GetPostResult{Post: post, Found: true}, nil
+	}
+	tool := utils.NewTool(&schema.ToolInfo{
+		Name: "get_post",
+		Desc: "根据传入的id查找对应帖子的内容",
+		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+			"post_id": &schema.ParameterInfo{
+				Type:     schema.Integer,
+				Required: true,
+			},
+		}),
+	}, handler)
 	return tool
 }
