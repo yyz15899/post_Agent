@@ -22,7 +22,9 @@ func InitDB() error {
 		return err
 	}
 	// 自动建表(监视同步)
-	err = DB.AutoMigrate(&model.PostSyncTask{})
+	err = DB.AutoMigrate(&model.PostSyncTask{},
+		&model.PostVote{},
+		&model.PostVoteSyncTask{})
 	if err != nil {
 		return err
 	}

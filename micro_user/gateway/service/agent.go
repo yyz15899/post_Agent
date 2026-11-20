@@ -135,7 +135,7 @@ func AgentChat(ctx context.Context, message *schema.Message, r *milvusRetriever.
 		return nil, err
 	}
 
-	content := strings.TrimSpace(message.Content)
+	content := strings.TrimSpace(message.Content) //处理首尾的空白符号
 	if content == "" {
 		log.Printf("请输入查询内容")
 		return nil, MessageEmpty

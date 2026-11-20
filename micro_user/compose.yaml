@@ -1,0 +1,18 @@
+name: micro-user
+
+services:
+  mysql:
+    image: mysql:9.7.0
+    container_name: micro-user-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请设置MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: my_db
+    command: ["--lower-case-table-names=1"]
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:

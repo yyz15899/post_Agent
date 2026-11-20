@@ -22,5 +22,19 @@ type PostSyncTask struct {
 	PostID int64     `json:"post_id"`
 	Status bool      `gorm:"default:false" json:"status"`
 	ReNum  int       `json:"renum"`   // 重试次数
-	ReTime time.Time `json:"te_time"` // 下次重试时间
+	ReTime time.Time `json:"re_time"` // 下次重试时间
+}
+
+// 监视redis同步是否有问题
+type PostVoteSyncTask struct {
+	TaskID int       `gorm:"primaryKey;autoIncrement"`
+	PostID int64     `json:"post_id"`
+	UserID int64     `json:"user_id"`
+	Status bool      `gorm:"default:false" json:"status"`
+	ReNum  int       `json:"renum"`   // 重试次数
+	ReTime time.Time `json:"re_time"` // 下次重试时间
+}
+
+type Direction struct {
+	Direction int `gorm:"direction"`
 }

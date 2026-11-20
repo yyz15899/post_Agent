@@ -20,8 +20,10 @@ func CreatePost(c context.Context, id int64, Title, Content string) (int64, erro
 		Title:     Title,
 		Content:   Content,
 	}
+
 	// 执行事务
 	err := DB.WithContext(c).Transaction(func(tx *gorm.DB) error {
+
 		err := tx.Model(&model.Post{}).Create(P).Error // 将P内容写到Post
 		if err != nil {
 			return err
@@ -33,7 +35,14 @@ func CreatePost(c context.Context, id int64, Title, Content string) (int64, erro
 			ReNum:  0,
 			ReTime: time.Now(), // 立即尝试同步
 		}
-		// 保存任务
+		//	 模拟创建post失败触发回调
+		// simulateTaskFailure := true
+		// if simulateTaskFailure {
+		// 	log.Printf("测试：帖子已写入事务，准备回滚，post_id=%d", P.Id)
+		// 	return errors.New("测试：模拟创建同步任务失败")
+		// }
+		//
+		// 创建并保存任务
 		err = tx.Model(model.PostSyncTask{}).Create(task).Error
 		if err != nil {
 			return err

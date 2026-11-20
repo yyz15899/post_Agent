@@ -5,14 +5,11 @@ import (
 	"log"
 	"micro_user/pb"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type UserHandler struct {
@@ -90,39 +87,13 @@ func (h *UserHandler) Signin(c *gin.Context) {
 }
 
 func (h *UserHandler) GetInfo(c *gin.Context) {
-	// 设置并验证请求头中的token
-	Authorization := c.GetHeader("Authorization")
-	parts := strings.Fields(Authorization)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") { // 无大小写比较字符串
-		c.JSON(http.StatusUnauthorized, gin.H{"msg": "缺少或无效的认证信息"})
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
-	defer cancel()
-	// 转交token给grpc
-	ctx = metadata.AppendToOutgoingContext(ctx, "token", parts[1])
-	Info, err := h.client.GetProfile(ctx, &emptypb.Empty{})
-	if err != nil {
-		switch status.Code(err) {
-		case codes.InvalidArgument:
-			c.JSON(http.StatusBadRequest, gin.H{"msg": "参数有误"})
-		case codes.Canceled:
-			c.JSON(http.StatusBadGateway, gin.H{"msg": "请求取消"})
-		case codes.DeadlineExceeded:
-			c.JSON(http.StatusGatewayTimeout, gin.H{"msg": "请求超时"})
-		case codes.Unauthenticated:
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"msg": "token无效或已过期,请重新登录",
-			})
-		default:
-			log.Printf("获取对应信息失败,err:%v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"msg": "获取信息失败"})
-		}
+	userinfo, ok := c.Get("user_profile")
+	if !ok { // 500(服务异常)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"msg": "没有查到相关信息"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"msg":  "成功查询用户信息",
-		"Info": Info,
+		"Info": userinfo,
 	})
 }

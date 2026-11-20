@@ -7,6 +7,7 @@ import (
 	"micro_user/gateway/dao"
 	"micro_user/gateway/model"
 	"micro_user/gateway/rag"
+	"time"
 
 	milvusIndexer "github.com/cloudwego/eino-ext/components/indexer/milvus2"
 )
@@ -15,11 +16,13 @@ import (
 // 同步入库(单篇post)
 func IndexSinglePost(ctx context.Context, post model.Post, indexer *milvusIndexer.Indexer) error {
 	doc := rag.PostToDocument([]model.Post{post})
+	start := time.Now()
 	id, err := indexer.Store(ctx, doc)
 	if err != nil {
 		log.Printf("文档id:%v 入库失败:%v", id, err)
 		return err
 	}
+	log.Printf("indexer.Store 耗时:%v,post_id%v", time.Since(start), id)
 	return nil
 }
 
