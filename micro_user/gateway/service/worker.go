@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
 	"log"
 	"micro_user/gateway/dao"
 	"sync"
@@ -46,32 +45,6 @@ func RunPostSyncWorker(ctx context.Context, indexer *milvusIndexer.Indexer) {
 
 // 同步点赞任务
 func RunPostVoteSyncWorker(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			// 查询需要同步的post(每轮200条数据)
-			// 认领机制
-			nexttime := time.Now().Add(30 * time.Second) // 30s租约时间
-			mu.Lock()
-			claimtoken := rand.Text()
-			tasks, err := dao.ListenPostVoteTask(ctx, 200, nexttime, claimtoken) // 这里的nexttime要保证后续Process操作执行完成
-			mu.Unlock()
-			if err != nil {
-				log.Printf("获取同步任务信息失败:%v", err)
-				continue
-			}
-			for _, task := range tasks {
-				// 同步redis
-				err = ProcessPostVoteSyncTask(ctx, task)
-				if err != nil {
-					log.Printf("任务 %d 同步失败：%v", task.TaskID, err)
-					continue
-				}
-			}
-		}
-	}
+	const workercount = 4
+
 }
