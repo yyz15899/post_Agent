@@ -7,6 +7,7 @@ import (
 	"micro_user/gateway/model"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
 )
 
@@ -61,7 +62,13 @@ func CreatePost(c context.Context, id int64, Title, Content string) (int64, erro
 
 func GetPostByID(c context.Context, postid int64) (*model.Post, error) {
 	var post model.Post
-	err := DB.WithContext(c).Where("id = ?", postid).First(&post).Error
+
+	// 计时
+	tracer := otel.Tracer("gateway_vote")
+	lookupCtx, lookupSpan := tracer.Start(c, "getdetail.post_lookup") // 开始计时
+	err := DB.WithContext(lookupCtx).Where("id = ?", postid).First(&post).Error
+	// 耗时
+	lookupSpan.End()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrPostNotExist
 	}

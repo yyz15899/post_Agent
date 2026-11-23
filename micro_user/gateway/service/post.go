@@ -10,6 +10,8 @@ import (
 	"time"
 
 	milvusIndexer "github.com/cloudwego/eino-ext/components/indexer/milvus2"
+	"go.opentelemetry.io/otel"
+	"gorm.io/gorm"
 )
 
 var KeywordEmpty = errors.New("关键字不能为空")
@@ -67,10 +69,14 @@ func ProcessPostSyncTask(ctx context.Context, indexer *milvusIndexer.Indexer, ta
 	return dao.MarkPostSyncTaskDone(ctx, task.TaskID)
 }
 
-// 只用记录上次(本次)用户的投票方向,也就是当前显示的世纪票数
+// 只用记录上次(本次)用户的投票方向,也就是当前显示的实际票数
 func VotePostByID(ctx context.Context, uid int64, pid int64, vote int) error {
 	// 保存票数(本次用户的投票方向)到DB
-	err := dao.UpSertPostVote(ctx, int64(vote), pid, uid)
+	//
+	tracer := otel.Tracer("gateway_vote")
+	lookupCtx, lookupSpan := tracer.Start(ctx, "dao_vote.post_vote")
+	err := dao.UpSertPostVote(lookupCtx, int64(vote), pid, uid)
+	lookupSpan.End()
 	if err != nil {
 		return err
 	}
@@ -95,12 +101,32 @@ func ProcessPostVoteSyncTask(ctx context.Context, task model.PostVoteSyncTask) e
 		}
 		// 失败则记录
 		nexttime := time.Now().Add(30 * time.Second)
-		retryerr := dao.SchedulePostVoteSyncTaskRetry(ctx, task.TaskID, nexttime)
+		retryerr := dao.SchedulePostVoteSyncTaskRetry(ctx, task, nexttime)
 		if retryerr != nil {
 			return errors.Join(syncerr, retryerr) // 两个err都返回
 		}
 		return syncerr // 本次同步失败，已安排后续重试
 	}
 	// redis同步成功
-	return dao.MarkPostVoteSyncTaskDone(ctx, int64(task.TaskID))
+	return dao.MarkPostVoteSyncTaskDone(ctx, task)
+}
+
+func GetScoreByID(ctx context.Context, postid int64) (float64, error) {
+	sc, err := dao.GetScoreByID(ctx, postid)
+	if err != nil {
+		return sc, err
+	}
+	return sc, nil
+}
+
+// 查询当前票数
+func GetScoreNow(ctx context.Context, userid int64, postid int64) (int, error) {
+	vote, err := dao.GetUserVote(ctx, userid, postid)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return vote.Direction, nil
 }

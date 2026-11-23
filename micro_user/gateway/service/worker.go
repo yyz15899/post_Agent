@@ -2,12 +2,16 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"log"
 	"micro_user/gateway/dao"
+	"sync"
 	"time"
 
 	milvusIndexer "github.com/cloudwego/eino-ext/components/indexer/milvus2"
 )
+
+var mu sync.Mutex
 
 // 进行循环入库操作
 func RunPostSyncWorker(ctx context.Context, indexer *milvusIndexer.Indexer) {
@@ -49,8 +53,13 @@ func RunPostVoteSyncWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// 查询需要同步的post(每轮50条数据)
-			tasks, err := dao.ListenPostVoteTask(ctx, 200)
+			// 查询需要同步的post(每轮200条数据)
+			// 认领机制
+			nexttime := time.Now().Add(30 * time.Second) // 30s租约时间
+			mu.Lock()
+			claimtoken := rand.Text()
+			tasks, err := dao.ListenPostVoteTask(ctx, 200, nexttime, claimtoken) // 这里的nexttime要保证后续Process操作执行完成
+			mu.Unlock()
 			if err != nil {
 				log.Printf("获取同步任务信息失败:%v", err)
 				continue

@@ -8,7 +8,7 @@ if #KEYS ~= 2 or #ARGV ~= 3 then
     return redis.error_reply('invalid vote arguments')
 end
 
-local newDirection = tonumber(ARGV[3])
+local newDirection = tonumber(ARGV[3])      
 if newDirection ~= 1 and newDirection ~= -1 then
     return redis.error_reply('direction must be 1 or -1')
 end
@@ -23,7 +23,7 @@ end
 
 if voteCountType ~= 'none' and voteCountType ~= 'zset' then
     return redis.error_reply('invalid vote count key type')
-end
+end         
 
 -- 查询旧方向，没有记录时按 0 处理。
 local oldDirection = tonumber(

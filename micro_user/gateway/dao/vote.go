@@ -97,3 +97,16 @@ func UpSertPostVote(ctx context.Context, direction int64, postid int64, userid i
 	})
 
 }
+
+// 查询post总票数
+func GetScoreByID(ctx context.Context, postid int64) (float64, error) {
+	like, err := RDB.ZScore(ctx, keyVoteNumZSet, strconv.FormatInt(postid, 10)).Result()
+	if errors.Is(err, redis.Nil) {
+		return 0, nil
+	}
+	if err != nil {
+		log.Printf("获取票数失败,:%v", err)
+		return 0, err
+	}
+	return like, nil
+}
