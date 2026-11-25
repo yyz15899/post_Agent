@@ -10,4 +10,5 @@ type PostVote struct {
 	Direction int   `gorm:"type:tinyint;not null"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	Version   int64 `gorm:"not null;default:1"`
 }

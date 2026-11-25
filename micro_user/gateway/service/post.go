@@ -11,6 +11,7 @@ import (
 
 	milvusIndexer "github.com/cloudwego/eino-ext/components/indexer/milvus2"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"gorm.io/gorm"
 )
 
@@ -89,32 +90,71 @@ func ProcessPostVoteSyncTask(ctx context.Context, task model.PostVoteSyncTask) e
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	tracer := otel.Tracer("name_gateway")
+	getscoreCtx, span := tracer.Start(ctx, "查出投票方向")
 	//读取本次投票方向
-	UserPostVote, syncerr := dao.GetUserVote(ctx, task.UserID, task.PostID)
-	if syncerr == nil {
-		// 查询vote数值成功
-		syncerr = dao.Vote(ctx, task.UserID, task.PostID, UserPostVote.Direction)
+	UserPostVote, syncerr := dao.GetUserVote(getscoreCtx, task.UserID, task.PostID)
+	if syncerr != nil {
+		span.RecordError(syncerr)
+		span.SetStatus(codes.Error, "获取direction失败")
 	}
+	span.End()
+
+	if syncerr == nil {
+		votescoreCtx, Vote_span := tracer.Start(ctx, "投票操作")
+		syncerr = dao.Vote(votescoreCtx, task.UserID, task.PostID, UserPostVote.Direction, UserPostVote.Version)
+		if syncerr != nil {
+			Vote_span.RecordError(syncerr)
+			Vote_span.SetStatus(codes.Error, "投票同步失败")
+		}
+		Vote_span.End()
+	}
+	// 查询vote数值成功
+
 	if syncerr != nil {
 		if ctx.Err() != nil { // 服务正在关闭时，保留未完成任务，重启后继续处理。
 			return syncerr
 		}
 		// 失败则记录
 		nexttime := time.Now().Add(30 * time.Second)
-		retryerr := dao.SchedulePostVoteSyncTaskRetry(ctx, task, nexttime)
+		retryCtx, retrySpan := tracer.Start(ctx, "安排任务重试")
+		retryerr := dao.SchedulePostVoteSyncTaskRetry(retryCtx, task, nexttime)
+		if retryerr != nil {
+			retrySpan.RecordError(retryerr)
+			retrySpan.SetStatus(codes.Error, "安排任务重试失败")
+		}
+		retrySpan.End()
 		if retryerr != nil {
 			return errors.Join(syncerr, retryerr) // 两个err都返回
 		}
 		return syncerr // 本次同步失败，已安排后续重试
 	}
 	// redis同步成功
-	return dao.MarkPostVoteSyncTaskDone(ctx, task)
+	doneCtx, doneSpan := tracer.Start(ctx, "标记任务完成")
+	doneErr := dao.MarkPostVoteSyncTaskDone(doneCtx, task)
+	if doneErr != nil {
+		doneSpan.RecordError(doneErr)
+		doneSpan.SetStatus(codes.Error, "标记任务完成失败")
+	}
+	doneSpan.End()
+	return doneErr
 }
 
 func GetScoreByID(ctx context.Context, postid int64) (float64, error) {
-	sc, err := dao.GetScoreByID(ctx, postid)
+	sc, exist, err := dao.GetScoreByID(ctx, postid)
 	if err != nil {
 		return sc, err
+	}
+	if !exist {
+		if err := dao.RestorePostVoteCache(ctx, postid); err != nil {
+			log.Printf("恢复投票缓存失败 post_id=%d: %v", postid, err)
+			return dao.SumPostVoteScore(ctx, postid)
+		}
+
+		sc, exist, err = dao.GetScoreByID(ctx, postid)
+		if err != nil || !exist {
+			return dao.SumPostVoteScore(ctx, postid)
+		}
 	}
 	return sc, nil
 }

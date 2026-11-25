@@ -223,7 +223,7 @@ func (p *PostHandler) GetScoreByID(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"msg": "查询失败"})
 		return
 	}
-	//
+	//	根据pid获取post总分数
 	score, err := service.GetScoreByID(ctx, postid)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"msg": "获取帖子总点赞失败"})

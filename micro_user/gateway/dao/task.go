@@ -59,7 +59,7 @@ func MarkPostSyncTaskDone(ctx context.Context, taskid int) error {
 // ------------------------------------
 
 // 同步redis
-func ListenPostVoteTask(ctx context.Context, limit int, nexttime time.Time, claimtoken string) ([]model.PostVoteSyncTask, error) {
+func ListenPostVoteTask(ctx context.Context, limit int, lease time.Duration, claimtoken string) ([]model.PostVoteSyncTask, error) {
 
 	var tasks []model.PostVoteSyncTask
 	err := DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -77,10 +77,17 @@ func ListenPostVoteTask(ctx context.Context, limit int, nexttime time.Time, clai
 			return nil
 		}
 		tids := make([]int, len(tasks))
+
+		// 计算租约时间
+		nexttime := time.Now().Add(lease)
+
+		// 将上面查到的task回填进结构体中 因为这些数据在auth建表时没有或采用默认值
 		for i, task := range tasks {
 			tids[i] = task.TaskID
 			tasks[i].ClaimToken = claimtoken
+			tasks[i].ReTime = nexttime
 		}
+
 		// 更新re_time
 		result := tx.WithContext(ctx).
 			Model(&model.PostVoteSyncTask{}).
@@ -128,8 +135,9 @@ func SchedulePostVoteSyncTaskRetry(ctx context.Context, task model.PostVoteSyncT
 		Model(&model.PostVoteSyncTask{}).
 		Where("task_id = ? AND claim_token = ? AND status = ? AND re_time > ?", task.TaskID, task.ClaimToken, false, time.Now()).
 		Updates(map[string]any{
-			"re_num":  gorm.Expr("re_num + ?", 1),
-			"re_time": nexttime,
+			"re_num":      gorm.Expr("re_num + ?", 1),
+			"re_time":     nexttime,
+			"claim_token": "",
 		})
 	if result.Error != nil {
 		return result.Error
