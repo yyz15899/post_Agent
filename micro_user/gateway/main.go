@@ -41,6 +41,18 @@ func main() {
 		log.Fatal(err)
 	}
 	defer con.Close() // 在下面匿名goroutine执行结束后执行
+	// 后台trace
+	tp, err := InitOtle(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	// 创建一个追踪器
+	tracer := tp.Tracer("gateway_vote")
+	// 关闭追踪
+	defer func() {
+		_ = tp.Shutdown(context.Background())
+	}()
+
 	// 创建grpc client
 	cli := pb.NewUserServiceClient(con)
 	// 创建milvus client
@@ -105,7 +117,7 @@ func main() {
 	r.GET("/api/posts/:id", postHandler.GetPostByID)
 	r.GET("/api/posts", postHandler.SearchPosts)
 
-	r.POST("api/posts/:id/vote", postHandler.VoteTiming(), middleware.VoteAuth([]byte(secret)), postHandler.VotePost)
+	r.POST("api/posts/:id/vote", postHandler.VoteTiming(), middleware.TraceingSpan(tracer), middleware.VoteAuth([]byte(secret)), postHandler.VotePost)
 
 	// 需要JWT的接口(路由组)
 	authenticated := r.Group("/api")
@@ -113,7 +125,8 @@ func main() {
 		postHandler.VoteTiming(), // 执行完的next()执行鉴权
 		middleware.AuthInterceptor(cli),
 	)
-
+	authenticated.GET("/getsc/:pid", postHandler.GetScoreByID)   // 查看post总票数
+	authenticated.GET("/getsc/:pid/user", postHandler.GetMyVote) // 查看当前用户投票方向
 	authenticated.GET("/getinfo", userHandler.GetInfo)
 	authenticated.POST("/posts", postHandler.CreatePost)
 	// authenticated.POST("/posts/:id/vote", postHandler.VoteTiming(), middleware.VoteAuth([]byte(secret)), postHandler.VotePost)

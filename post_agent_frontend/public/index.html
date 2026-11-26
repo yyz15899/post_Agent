@@ -1,0 +1,857 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="forum-mode" content="live">
+<meta name="description" content="Post Agent 技术论坛，搜索帖子、分享开发经验，或用 AI 寻找站内资料。">
+<title>Post Agent · 技术社区</title>
+<style>
+:root{--bg:#f7f7fb;--card:#fff;--ink:#1b1931;--muted:#626077;--line:#e8e6ef;--accent:#6245e5;--accent-dark:#5035cb;--soft:#f0edff;--radius:19px;--shadow:0 1px 2px #23195106,0 5px 18px #23195105}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+button:disabled{cursor:wait;opacity:.63}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:3px solid #8b73f8;outline-offset:4px}
+[hidden]{display:none!important}
+h1,h2,h3,p{margin:0}
+svg.icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:middle}
+.top{position:sticky;top:0;z-index:5;background:#ffffffee;backdrop-filter:blur(9px);border-bottom:1px solid var(--line)}
+.bar{max-width:1224px;margin:auto;padding:0 28px;min-height:72px;display:flex;align-items:center;gap:34px}
+.brand{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;font-weight:800;letter-spacing:-.035em;font-size:21px;line-height:1.07}
+.brand-mark{display:grid;place-items:center;background:var(--accent);width:38px;height:38px;border-radius:11px;color:#fff;box-shadow:0 3px 8px #6245e544}
+.brand-mark .icon{width:23px;height:23px}
+.brand em{font-style:normal;color:var(--accent)}
+.nav{display:flex;gap:8px;align-items:center}
+.nav a{font-size:14px;font-weight:700;padding:8px 13px;border-radius:9px;white-space:nowrap;color:var(--muted)}
+.nav a[aria-current]{background:var(--soft);color:var(--accent-dark)}
+.bar-actions{margin-left:auto;display:flex;gap:10px;align-items:center}
+.btn{border:1px solid transparent;border-radius:10px;background:var(--accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:8px 15px;font-size:14px;font-weight:750;white-space:nowrap}
+.btn:hover{background:var(--accent-dark)}
+.btn.ghost{border-color:var(--line);background:#fff;color:var(--ink)}
+.btn.ghost:hover{background:var(--soft);border-color:#d9cffb}
+.btn.link{background:none;color:var(--accent-dark);padding-inline:4px}
+.btn.link:hover{text-decoration:underline}
+.icon-btn{display:grid;place-items:center;width:42px;height:42px;background:#fff;color:var(--muted);border:1px solid var(--line);border-radius:10px}
+.icon-btn:hover{background:var(--soft);color:var(--accent-dark)}
+.frame{max-width:1224px;margin:auto;padding:27px 28px 0}
+.mode-line{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted);margin-bottom:14px}
+.mode-badge{display:inline-flex;align-items:center;gap:7px;font-weight:700}
+.mode-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:#8066ed}
+.mode-line .btn{font-size:13px;min-height:28px;padding-block:0}
+.hero{position:relative;overflow:hidden;isolation:isolate;background:radial-gradient(ellipse at 89% 4%,#5934a9 0%,transparent 59%),linear-gradient(117deg,#211639,#322058 85%);color:#fff;border-radius:23px;min-height:258px;padding:36px 39px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start}
+.hero > *{position:relative;z-index:1}
+.hero .eyebrow{display:flex;align-items:center;gap:9px;color:#ddd1ff;font-size:14px;font-weight:700}
+.hero h1{font-size:clamp(1.95rem,4.3vw,3.2rem);line-height:1.18;letter-spacing:-.045em;margin:10px 0 12px}
+.hero p{color:#ebe2ff;max-width:34rem}
+.hero-actions{margin-top:23px;display:flex;flex-wrap:wrap;gap:10px}
+.hero .btn{background:#ae96ff;color:#21123c;border-color:#ae96ff}
+.hero .btn:hover{background:#c6b6ff}
+.hero .btn.ghost{background:#fff1;border-color:#fff4;color:#fff}
+.hero .btn.ghost:hover{background:#fff3}
+.orbit{position:absolute;z-index:0;right:3%;top:50%;transform:translateY(-50%) rotate(-22deg);width:min(43%,420px);aspect-ratio:1;pointer-events:none;background:radial-gradient(circle at center,#ca9aff33,transparent 54%);opacity:.87}
+.orbit i{position:absolute;inset:var(--inset);border:1px solid #ddc6ff60;border-radius:50%;box-shadow:0 0 28px #a679ff14 inset}
+.orbit i::after{content:"";position:absolute;left:var(--x);top:var(--y);width:var(--size);height:var(--size);border-radius:50%;background:#ddc9ff;box-shadow:0 0 22px 5px #bb8aff93}
+.orbit::after{content:"";position:absolute;inset:36%;border-radius:37%;transform:rotate(43deg);background:linear-gradient(145deg,#f4d8ff,#ae84fa 48%,#593898 80%);box-shadow:0 0 35px #e3aaff66,inset 0 0 18px #fff4}
+.layout{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(270px,1fr);gap:23px;margin-top:28px;align-items:start}
+.section-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+h2{font-size:25px;letter-spacing:-.035em;line-height:1.35}
+.small{font-size:13px;color:var(--muted)}
+.muted{color:var(--muted)}
+.search{display:flex;gap:9px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:6px;margin-bottom:12px;box-shadow:var(--shadow)}
+.search label{display:flex;align-items:center;gap:9px;color:var(--muted);min-width:0;flex:1;padding-left:10px}
+.search input{border:0;background:none;min-width:0;width:100%;outline:none;padding:7px 5px;color:var(--ink)}
+.search:focus-within{border-color:#a491f7}
+.search .btn{min-height:38px}
+.results{display:grid;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.post{display:grid;grid-template-columns:44px minmax(0,1fr);gap:13px;padding:17px 19px;transition:border-color .16s,box-shadow .16s}
+.post:hover{border-color:#d7cef9;box-shadow:0 5px 18px #3c27700b}
+.post-icon{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--soft);color:var(--accent-dark)}
+.post-icon.green{background:#e4f5ee;color:#226e54}
+.post-icon.orange{background:#fff0df;color:#9a521f}
+.post-icon.blue{background:#e7efff;color:#3a5cb7}
+.post h3{font-size:17px;line-height:1.45;margin-bottom:3px}
+.post h3 a:hover{color:var(--accent-dark);text-decoration:underline;text-underline-offset:3px}
+.snippet{font-size:14px;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.meta{display:flex;gap:9px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:13px;margin-top:8px}
+.tag{display:inline-block;font-size:12px;font-weight:700;background:#f2effc;color:#523c9c;border-radius:6px;padding:0 7px}
+.side{display:grid;gap:14px;padding-top:1px}
+.side-card{padding:19px}
+.side-card.ai{background:linear-gradient(147deg,#f3efff,#fff 70%);border-color:#e5ddff}
+.side-head{display:flex;gap:10px;align-items:center;margin-bottom:7px}
+.side-head .post-icon{width:36px;height:36px;border-radius:11px}
+.side-head h2{font-size:18px;letter-spacing:-.03em}
+.side-card p{font-size:14px;color:var(--muted)}
+.suggestions{display:grid;gap:8px;margin-top:14px}
+.suggestion{border:1px solid #e8e1fa;background:#ffffffcf;border-radius:9px;color:#423569;text-align:left;padding:9px 11px;display:flex;align-items:center;gap:8px;font-size:14px}
+.suggestion:hover{background:#f1eaff;border-color:#d9c9ff}
+.suggestion .icon{width:16px;height:16px;color:var(--accent)}
+.side-card .btn{margin-top:12px;width:100%}
+.id-form{display:flex;gap:7px;margin-top:11px}
+.id-form input{min-width:0;width:100%}
+.id-form .btn{margin:0;width:auto}
+.field{background:#fff;border:1px solid #d9d6e6;border-radius:9px;color:var(--ink);padding:9px 11px;width:100%}
+.field:focus{border-color:#8970ef}
+.empty{padding:32px 22px;text-align:center}
+.empty h3{margin-bottom:6px}
+.empty .btn{margin-top:13px}
+.screen{max-width:880px;margin:0 auto}
+.crumb{display:inline-flex;align-items:center;gap:8px;margin-bottom:13px;font-size:14px;color:var(--accent-dark);font-weight:750}
+.page-card{padding:clamp(19px,4vw,36px)}
+.page-card h1{font-size:clamp(1.65rem,4vw,2.35rem);line-height:1.23;overflow-wrap:anywhere}
+.page-card .meta{margin:12px 0 19px}
+.body-copy{white-space:pre-wrap;overflow-wrap:anywhere;padding:19px 0 25px;border-top:1px solid var(--line)}
+.vote-box{border-top:1px solid var(--line);padding-top:16px}
+.vote-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+.vote-actions [aria-pressed="true"]{background:var(--soft);border-color:#beaefb;color:var(--accent-dark)}
+.status{color:#5c477f;font-size:14px;min-height:24px}
+.error{color:#a22c42;font-size:14px;min-height:24px;overflow-wrap:anywhere}
+.chat-info{margin:9px 0 18px}
+.chat-form label,.stack label{display:grid;gap:5px;font-weight:700;font-size:14px}
+textarea{resize:vertical;min-height:95px}
+.chat-controls{display:flex;gap:10px;margin-top:10px}
+.answer{margin-top:21px;padding:17px 19px;background:#f8f6ff;border:1px solid #e9e1ff;border-radius:13px}
+.answer h2{font-size:18px;margin-bottom:9px}
+.sources{margin:12px 0 0;padding-left:22px}
+.sources a{color:var(--accent-dark);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:30px;padding:15px 0 22px;font-size:13px;color:var(--muted)}
+dialog{border:1px solid var(--line);border-radius:19px;background:#fff;color:var(--ink);padding:22px;width:min(480px,calc(100% - 28px));max-height:calc(100% - 28px);box-shadow:0 18px 80px #2319514d}
+dialog::backdrop{background:#19132988}
+.dialog-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.stack{display:grid;gap:10px}
+.stack .btn{justify-self:start}
+.toast{position:fixed;z-index:10;bottom:18px;right:18px;max-width:min(390px,calc(100% - 36px));background:#292044;color:#fff;padding:11px 15px;border-radius:11px;box-shadow:0 6px 24px #20153b39;font-size:14px}
+@media(max-width:820px){.bar{gap:15px;padding-inline:17px}.frame{padding-inline:17px}.hero{padding-inline:28px}.layout{grid-template-columns:minmax(0,1fr);gap:19px}.side{grid-template-columns:1fr 1fr}.orbit{right:-5%;width:52%}}
+@media(max-width:550px){.bar{gap:8px;min-height:64px;padding-inline:12px}.brand{font-size:17px;gap:6px}.brand-mark{width:31px;height:31px;border-radius:8px}.brand-mark .icon{width:19px;height:19px}.nav{gap:1px}.nav a{font-size:13px;padding:6px 7px}.bar-actions{gap:5px}.bar-actions .btn{min-height:34px;padding:5px 8px;font-size:13px}.bar-actions .icon{display:none}.frame{padding:16px 12px 0}.hero{padding:25px 19px;min-height:245px}.hero p{font-size:14px}.orbit{opacity:.45;right:-16%;width:70%}.side{grid-template-columns:1fr}.post{padding:13px;gap:10px;grid-template-columns:37px minmax(0,1fr)}.post-icon{width:37px;height:37px}.section-top{align-items:flex-start}.section-top span{text-align:right}.mode-line{align-items:flex-start}}
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+<symbol id="i-logo" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4zM8 10h8m-8 3h5"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.1 6.9L21 12l-6.9 2.1L12 21l-2.1-6.9L3 12l6.9-2.1L12 3ZM19 3v4m-2-2h4"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.6" cy="10.6" r="6.1"/><path d="m15 15 5 5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v14c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></symbol>
+<symbol id="i-hash" viewBox="0 0 24 24"><path d="m10 4-3 16m10-16-3 16M4 9h17M3 15h17"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16M7 15l4-5 4 3 5-7"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+</svg>
+<header class="top">
+  <div class="bar">
+    <a href="#forum" class="brand" aria-label="Post Agent 社区首页"><span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-logo"/></svg></span><span>Post <em>Agent</em></span></a>
+    <nav class="nav" aria-label="主导航"><a id="nav-forum" href="#forum">社区</a><a id="nav-agent" href="#agent">AI 搜帖</a></nav>
+    <div class="bar-actions">
+      <button class="btn ghost" id="account" type="button"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><span id="account-label">登录</span></button>
+      <button class="btn" type="button" data-compose><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>发帖</button>
+    </div>
+  </div>
+</header>
+<main class="frame">
+  <div class="mode-line"><span class="mode-badge" id="mode-label"></span><button type="button" class="btn link" id="mode-switch"></button></div>
+  <section id="forum-view">
+    <div class="hero">
+      <div class="orbit" aria-hidden="true"><i style="--inset:9%;--x:16%;--y:14%;--size:7px"></i><i style="--inset:19%;--x:84%;--y:12%;--size:10px"></i><i style="--inset:28%;--x:15%;--y:84%;--size:6px"></i></div>
+      <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-logo"/></svg>开发者技术社区</div>
+      <h1>分享实践，找到答案。</h1>
+      <p>记录开发中解决的问题，也从其他人的帖子里找思路。</p>
+      <div class="hero-actions"><button class="btn" type="button" id="focus-search"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>搜索帖子</button><a class="btn ghost" href="#agent"><svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg>用 AI 找答案</a></div>
+    </div>
+    <div class="layout">
+      <section aria-labelledby="feed-title">
+        <div class="section-top"><h2 id="feed-title">帖子广场</h2><span class="small" id="feed-caption"></span></div>
+        <form id="search-form" class="search" role="search">
+          <label><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><input id="keyword" type="search" aria-label="帖子关键词" placeholder="搜索标题或正文，例如 Redis、Go、RAG" required maxlength="120"></label>
+          <button class="btn" type="submit">搜索</button>
+        </form>
+        <div id="results" class="results" aria-live="polite"></div>
+      </section>
+      <aside class="side">
+        <section class="card side-card ai">
+          <div class="side-head"><span class="post-icon"><svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg></span><h2>AI 搜帖</h2></div>
+          <p>用一句话描述问题，获取站内帖子摘要和出处。</p>
+          <div id="suggestions" class="suggestions"></div>
+          <a href="#agent" class="btn ghost">打开 AI 搜帖</a>
+        </section>
+        <section class="card side-card">
+          <div class="side-head"><span class="post-icon blue"><svg class="icon" aria-hidden="true"><use href="#i-hash"/></svg></span><h2>按 ID 找帖</h2></div>
+          <p>已有帖子编号？直接打开对应详情。</p>
+          <form class="id-form" id="id-form"><input class="field" aria-label="帖子 ID" inputmode="numeric" pattern="[1-9][0-9]*" maxlength="19" placeholder="例如 101" required><button class="btn ghost">打开</button></form>
+        </section>
+      </aside>
+    </div>
+  </section>
+  <section class="screen" id="post-view" hidden>
+    <a class="crumb" href="#forum">返回社区</a>
+    <article class="card page-card" id="post-detail" aria-live="polite"></article>
+  </section>
+  <section class="screen" id="agent-view" hidden>
+    <a class="crumb" href="#forum">返回社区</a>
+    <article class="card page-card">
+      <div class="side-head"><span class="post-icon"><svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg></span><h1>AI 搜帖</h1></div>
+      <p class="muted chat-info" id="chat-info"></p>
+      <form class="chat-form" id="chat-form">
+        <label>你想了解什么？<textarea class="field" id="question" required maxlength="2000" rows="4" placeholder="例如：Redis 投票分数丢失后，怎样从 MySQL 恢复？"></textarea></label>
+        <div class="chat-controls"><button class="btn" id="chat-send">发送问题</button><button class="btn ghost" id="chat-stop" type="button" hidden>停止回答</button></div>
+      </form>
+      <p class="error" id="chat-error" role="status"></p>
+      <section class="answer" id="answer-box" hidden><h2>回答</h2><p class="body-copy" id="answer-text" aria-live="polite"></p><p class="status" id="answer-status" role="status"></p><div id="sources-box" hidden><h3>参考帖子</h3><ul class="sources" id="sources"></ul></div></section>
+    </article>
+  </section>
+  <footer><span>Post Agent · 技术社区</span><span>关键词搜索与站内 AI 问答</span></footer>
+</main>
+<dialog id="auth-dialog" aria-labelledby="auth-title">
+  <div class="dialog-head"><h2 id="auth-title">登录</h2><button class="icon-btn" type="button" aria-label="关闭" data-close="auth-dialog"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <form id="auth-form" class="stack">
+    <p class="muted" id="auth-note"></p>
+    <label>用户名<input class="field" name="username" required maxlength="64" autocomplete="username"></label>
+    <label id="password-label">密码<input class="field" name="password" type="password" required autocomplete="current-password"></label>
+    <p class="error" role="status" id="auth-error"></p>
+    <button class="btn" id="auth-submit">登录</button>
+    <button class="btn link" id="auth-toggle" type="button">注册账号</button>
+  </form>
+  <div id="auth-account" class="stack" hidden><p id="auth-name"></p><button class="btn ghost" id="logout" type="button">退出登录</button></div>
+</dialog>
+<dialog id="compose-dialog" aria-labelledby="compose-title">
+  <div class="dialog-head"><h2 id="compose-title">发布帖子</h2><button class="icon-btn" type="button" aria-label="关闭" data-close="compose-dialog"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <form id="compose-form" class="stack">
+    <label>标题<input name="title" class="field" required maxlength="200" placeholder="用一句话说明帖子主题"></label>
+    <label>正文<textarea name="content" class="field" required rows="7" placeholder="写下问题、思路或验证结果"></textarea></label>
+    <p class="error" id="compose-error" role="status"></p>
+    <button class="btn" id="publish">发布帖子</button>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const svg = (id) => '<svg class="icon" aria-hidden="true"><use href="#i-' + id + '"/></svg>';
+const node = (tag, classes, value) => {
+  const el = document.createElement(tag);
+  if (classes) el.className = classes;
+  if (value !== undefined) el.textContent = value;
+  return el;
+};
+const samplePosts = [
+  { id: "101", title: "Redis 投票缓存丢失后，怎么恢复总分？", author: "后端笔记", tag: "Redis", icon: "db", color: "green", score: 18, content: "MySQL 中保留每个用户的投票方向和版本，可以按帖子读取完整快照并重新聚合总分。\n\n我用 Redis Lua 一次写回用户方向、版本与总分。恢复前检查恢复锁的 token，写回时再检查快照是否已经由其他执行者创建。验证时对照 MySQL 的 SUM(direction)，同时检查缓存数据部分丢失的情况。" },
+  { id: "102", title: "Go Worker 如何避免多进程重复领取任务？", author: "Go 实战", tag: "Go", icon: "code", color: "", score: 12, content: "领取任务时，在同一个 MySQL 事务中用 SELECT FOR UPDATE SKIP LOCKED 找到待处理任务，并写入租约过期时间和 claim token。\n\n完成或安排重试时，检查 token 和租约。处理结果落到外部系统时，仍需独立的幂等或版本保护，因为任务在租约过期后可能再次执行。" },
+  { id: "103", title: "Eino 和 Milvus 如何做一个能引用出处的站内 Agent？", author: "Agent 实验室", tag: "RAG", icon: "spark", color: "blue", score: 9, content: "将帖子转成带有 post_id 和标题的文档，写入 Milvus。Agent 需要资料时调用语义检索，再按需要查询帖子详情。\n\n回复用 SSE 渐进输出，独立发出来源事件。这样读者可以核对答案引用的帖子。" },
+  { id: "104", title: "k6 压测异步投票，应该看哪些指标？", author: "性能观察", tag: "压测", icon: "chart", color: "orange", score: 7, content: "分别记录 HTTP 成功吞吐量、P95 和错误率，以及后台任务完成速率、积压曲线和排空时间。\n\n固定环境、数据和流量分布后，再对比不同 Worker 数量。停压并排空后，核对 MySQL 与 Redis 的实际投票数据。" }
+];
+const exampleQuestions = [
+  "Redis 投票缓存丢了怎么恢复？",
+  "多个 Worker 如何安全领取任务？",
+  "怎么给 RAG 回答加帖子出处？"
+];
+
+function readSession(key, fallback) {
+  try { return JSON.parse(sessionStorage.getItem("post-agent:" + key)) ?? fallback; }
+  catch { return fallback; }
+}
+function writeSession(key, value) {
+  try {
+    if (value === null) sessionStorage.removeItem("post-agent:" + key);
+    else sessionStorage.setItem("post-agent:" + key, JSON.stringify(value));
+  } catch { /* Storage may be unavailable in an embedded preview. */ }
+}
+const standalone = location.protocol === "file:";
+const preferredMode = new URLSearchParams(location.search).get("mode");
+const initialMode = document.querySelector('meta[name="forum-mode"]').content;
+let isDemo = standalone || (preferredMode ? preferredMode === "demo" : initialMode === "demo");
+let session = readSession("auth:" + (isDemo ? "demo" : "live"), null);
+let afterLogin = null;
+let authVariant = "signin";
+let searchTerm = "";
+let liveSearch = [];
+let searchState = "idle";
+let searchVersion = 0;
+let detailVersion = 0;
+let voteRefreshVersion = 0;
+let chatController = null;
+let toastTimer;
+const demoPosts = readSession("demo-posts", samplePosts);
+const demoVotes = readSession("demo-votes", {});
+const publishedPosts = readSession("posted", []);
+
+function saveAuth(next) {
+  session = next;
+  writeSession("auth:" + (isDemo ? "demo" : "live"), session);
+  $("account-label").textContent = session ? "我的" : "登录";
+}
+function showToast(message) {
+  clearTimeout(toastTimer);
+  $("toast").textContent = message;
+  $("toast").hidden = false;
+  toastTimer = setTimeout(() => { $("toast").hidden = true; }, 4200);
+}
+async function api(path, { method = "GET", body, auth = false, signal, stream = false } = {}) {
+  const headers = { Accept: stream ? "text/event-stream, application/json" : "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const usedSession = session;
+  if (auth && usedSession?.token) headers.Authorization = "Bearer " + usedSession.token;
+  let response;
+  try {
+    response = await fetch("/api" + path, {
+      method, headers, body: body === undefined ? undefined : JSON.stringify(body),
+      signal, cache: "no-store"
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw error;
+    throw new Error("无法连接服务，请检查网关是否在运行。");
+  }
+  const type = response.headers.get("content-type") || "";
+  if (response.ok && stream && type.includes("text/event-stream")) return response;
+  const data = type.includes("application/json") ? await response.json().catch(() => null) : null;
+  if (!response.ok) {
+    if (auth && response.status === 401 && usedSession === session) {
+      saveAuth(null);
+      if (!$("post-view").hidden && !location.hash.startsWith("#agent")) renderRoute();
+    }
+    throw new Error(data?.msg || "请求失败（HTTP " + response.status + "）。");
+  }
+  if (stream || data === null) throw new Error(data?.msg || "网关返回了无法识别的响应。");
+  return data;
+}
+function cleanID(value) {
+  const id = String(value ?? "");
+  return /^[1-9]\d{0,18}$/.test(id) ? id : "";
+}
+function normalizePost(raw) {
+  const authorID = raw.Author_id ?? raw.author_id;
+  return {
+    id: cleanID(raw.Id ?? raw.id),
+    title: raw.Title ?? raw.title ?? "未命名帖子",
+    content: raw.Content ?? raw.content ?? "",
+    author: authorID != null ? "用户 #" + authorID : "",
+    createdAt: raw.CreatedAt ?? raw.created_at
+  };
+}
+function shortDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("zh-CN");
+}
+function openPost(id) {
+  const hash = "#post/" + id;
+  if (location.hash === hash) renderRoute();
+  else location.hash = hash;
+}
+function makeMeta(post) {
+  const meta = node("div", "meta");
+  for (const value of [post.author, shortDate(post.createdAt), "#" + post.id]) {
+    if (value) meta.append(node("span", "", value));
+  }
+  if (post.tag) meta.append(node("span", "tag", post.tag));
+  return meta;
+}
+function postCard(post) {
+  const card = node("article", "card post");
+  const marker = node("span", "post-icon " + (post.color || ""));
+  marker.innerHTML = svg(post.icon || "logo");
+  const main = node("div");
+  const title = node("h3");
+  const link = node("a", "", post.title);
+  link.href = "#post/" + post.id;
+  title.append(link);
+  main.append(title, node("p", "snippet", post.content.replace(/\s+/g, " ")), makeMeta(post));
+  card.append(marker, main);
+  return card;
+}
+function blank(title, message, compose = false) {
+  const box = node("div", "card empty");
+  box.append(node("h3", "", title), node("p", "muted", message));
+  if (compose) {
+    const button = node("button", "btn ghost", "发布帖子");
+    button.type = "button";
+    button.addEventListener("click", startCompose);
+    box.append(button);
+  }
+  return box;
+}
+function demoMatches(term) {
+  const needle = term.toLowerCase();
+  return demoPosts.filter((post) => [post.title, post.content, post.tag].some(
+    (text) => String(text || "").toLowerCase().includes(needle)
+  ));
+}
+function renderFeed() {
+  const results = $("results");
+  results.replaceChildren();
+  let posts;
+  if (isDemo) {
+    posts = searchTerm ? demoMatches(searchTerm) : demoPosts;
+    $("feed-caption").textContent = searchTerm ? posts.length + " 条搜索结果" : "演示帖子";
+  } else if (searchState === "loading") {
+    $("feed-caption").textContent = "正在搜索";
+    results.append(blank("正在查找帖子", "请稍候。"));
+    return;
+  } else if (searchState === "error") {
+    $("feed-caption").textContent = "";
+    results.append(blank("搜索失败", liveSearch));
+    return;
+  } else if (searchTerm) {
+    posts = liveSearch;
+    $("feed-caption").textContent = posts.length + " 条搜索结果";
+  } else {
+    posts = publishedPosts;
+    $("feed-caption").textContent = posts.length ? "本次会话发布" : "按关键词查找";
+  }
+  if (!posts.length) {
+    results.append(searchTerm ? blank("没有匹配的帖子", "换个关键词，或按帖子 ID 查找。")
+      : blank("搜索社区帖子", "输入关键词查找标题或正文。也可以发一篇新帖。", true));
+    return;
+  }
+  results.append(...posts.map(postCard));
+}
+
+$("search-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const keyword = $("keyword").value.trim();
+  if (!keyword) {
+    showToast("请输入搜索关键词。");
+    return;
+  }
+  const version = ++searchVersion;
+  searchTerm = keyword;
+  if (!isDemo) searchState = "loading";
+  renderFeed();
+  if (isDemo) return;
+  try {
+    const data = await api("/posts?keyword=" + encodeURIComponent(keyword));
+    if (version !== searchVersion) return;
+    liveSearch = (data.posts || []).map(normalizePost).filter((post) => post.id);
+    searchState = "done";
+  } catch (error) {
+    if (version !== searchVersion) return;
+    liveSearch = error.message;
+    searchState = "error";
+  }
+  renderFeed();
+});
+$("keyword").addEventListener("input", () => {
+  if ($("keyword").value.trim()) return;
+  searchVersion++;
+  searchTerm = "";
+  searchState = "idle";
+  renderFeed();
+});
+$("focus-search").addEventListener("click", () => $("keyword").focus());
+$("id-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const id = cleanID(event.target.querySelector("input").value.trim());
+  if (id) openPost(id);
+});
+
+function requireLogin(action) {
+  if (session) return true;
+  afterLogin = action;
+  openAuth("signin");
+  return false;
+}
+function openAuth(variant) {
+  authVariant = variant;
+  $("auth-error").textContent = "";
+  $("auth-form").reset();
+  const hasSession = !!session;
+  const signup = variant === "signup";
+  $("auth-title").textContent = hasSession ? "我的账号" : isDemo ? "体验演示" : signup ? "注册账号" : "登录";
+  $("auth-form").hidden = hasSession;
+  $("auth-account").hidden = !hasSession;
+  $("auth-name").textContent = session?.name || "";
+  $("auth-note").textContent = isDemo ? "输入一个昵称，即可在演示中发帖、投票。" :
+    signup ? "注册成功后即可登录。" : "登录后可以发布帖子、投票和使用 AI 搜帖。";
+  $("password-label").hidden = isDemo;
+  $("auth-form").elements.password.required = !isDemo;
+  $("auth-form").elements.password.autocomplete = signup ? "new-password" : "current-password";
+  $("auth-toggle").hidden = isDemo || hasSession;
+  $("auth-toggle").textContent = signup ? "已有账号，去登录" : "注册账号";
+  $("auth-submit").textContent = isDemo ? "进入演示" : signup ? "注册" : "登录";
+  if (!$("auth-dialog").open) $("auth-dialog").showModal();
+}
+$("account").addEventListener("click", () => { afterLogin = null; openAuth("signin"); });
+$("auth-toggle").addEventListener("click", () => openAuth(authVariant === "signup" ? "signin" : "signup"));
+$("auth-dialog").addEventListener("close", () => { afterLogin = null; });
+$("logout").addEventListener("click", () => {
+  saveAuth(null);
+  chatController?.abort();
+  $("auth-dialog").close();
+  showToast("已退出登录。");
+  renderRoute();
+});
+$("auth-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const fields = event.target.elements;
+  const name = fields.username.value.trim();
+  if (!name) { $("auth-error").textContent = "请输入用户名。"; return; }
+  $("auth-error").textContent = "";
+  $("auth-submit").disabled = true;
+  $("auth-toggle").disabled = true;
+  try {
+    if (isDemo) {
+      saveAuth({ name });
+    } else {
+      const body = { Username: name, Password: fields.password.value };
+      if (authVariant === "signup") {
+        await api("/signup", { method: "POST", body });
+        openAuth("signin");
+        $("auth-form").elements.username.value = name;
+        $("auth-form").elements.password.focus();
+        showToast("注册成功，请登录。");
+        return;
+      }
+      const data = await api("/signin", { method: "POST", body });
+      if (typeof data.token !== "string" || !data.token) throw new Error("登录响应缺少凭据。");
+      saveAuth({ name, token: data.token });
+    }
+    const action = afterLogin;
+    afterLogin = null;
+    $("auth-dialog").close();
+    showToast("登录成功。");
+    renderRoute();
+    if (action) action();
+  } catch (error) {
+    $("auth-error").textContent = error.message;
+  } finally {
+    $("auth-submit").disabled = false;
+    $("auth-toggle").disabled = false;
+  }
+});
+
+function startCompose() {
+  if (!requireLogin(startCompose)) return;
+  $("compose-error").textContent = "";
+  if (!$("compose-dialog").open) $("compose-dialog").showModal();
+}
+for (const button of document.querySelectorAll("[data-compose]")) button.addEventListener("click", startCompose);
+for (const button of document.querySelectorAll("[data-close]")) {
+  button.addEventListener("click", () => $(button.dataset.close).close());
+}
+$("compose-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const fields = event.target.elements;
+  const title = fields.title.value.trim();
+  const content = fields.content.value.trim();
+  if (!title || !content) { $("compose-error").textContent = "请填写标题和正文。"; return; }
+  if (!session) { $("compose-error").textContent = "登录已失效，请关闭窗口并重新登录。"; return; }
+  $("compose-error").textContent = "";
+  $("publish").disabled = true;
+  try {
+    let id;
+    const createdAt = new Date().toISOString();
+    if (isDemo) {
+      id = String(Math.max(104, ...demoPosts.map((post) => Number(post.id))) + 1);
+      demoPosts.unshift({ id, title, content, author: session.name, createdAt, score: 0 });
+      writeSession("demo-posts", demoPosts);
+    } else {
+      const data = await api("/posts", { method: "POST", body: { title, content }, auth: true });
+      id = cleanID(data.postid);
+      if (!id) throw new Error("帖子发布响应缺少有效 ID。");
+      publishedPosts.unshift({ id, title, content, author: session.name, createdAt });
+      if (publishedPosts.length > 20) publishedPosts.length = 20;
+      writeSession("posted", publishedPosts);
+    }
+    event.target.reset();
+    $("compose-dialog").close();
+    showToast("帖子已发布。");
+    openPost(id);
+  } catch (error) {
+    $("compose-error").textContent = error.message;
+  } finally {
+    $("publish").disabled = false;
+  }
+});
+
+function votePanel(post, version) {
+  const box = node("section", "vote-box");
+  box.append(node("h2", "", "帖子投票"));
+  const scoreLabel = node("p", "muted");
+  const actions = node("div", "vote-actions");
+  const status = node("p", "status");
+  status.setAttribute("role", "status");
+  const up = node("button", "btn ghost", "赞同 +1");
+  const down = node("button", "btn ghost", "反对 −1");
+  const refresh = node("button", "btn link", "刷新分数");
+  for (const button of [up, down, refresh]) button.type = "button";
+  actions.append(up, down, refresh);
+  box.append(scoreLabel, actions, status);
+
+  let direction = 0;
+  let score;
+  let submitting = false;
+  function draw() {
+    scoreLabel.textContent = score === undefined ?
+      session ? "净得分暂不可用" : "登录后查看净得分" : "净得分 " + score;
+    up.setAttribute("aria-pressed", String(direction === 1));
+    down.setAttribute("aria-pressed", String(direction === -1));
+    up.disabled = submitting;
+    down.disabled = submitting;
+    refresh.disabled = submitting;
+    refresh.hidden = isDemo || !session;
+  }
+  async function readScore() {
+    const data = await api("/getsc/" + post.id, { auth: true });
+    if (typeof data.vote_num !== "number") throw new Error("网关未返回有效的投票分数。");
+    return data.vote_num;
+  }
+  let voteChanged = false;
+  async function loadVote() {
+    if (isDemo) {
+      direction = demoVotes[post.id] || 0;
+      score = (post.score || 0) + direction;
+      draw();
+    } else if (session) {
+      const initial = await Promise.allSettled([
+        readScore(), api("/getsc/" + post.id + "/user", { auth: true })
+      ]);
+      if (version !== detailVersion || voteChanged) return;
+      if (initial[0].status === "fulfilled") score = initial[0].value;
+      if (initial[1].status === "fulfilled") direction = Number(initial[1].value.direction) || 0;
+      const failure = initial.find((item) => item.status === "rejected");
+      if (failure) status.textContent = failure.reason.message;
+      draw();
+    }
+  }
+  async function vote(newDirection) {
+    if (submitting) return;
+    if (!requireLogin()) return;
+    submitting = true;
+    voteChanged = true;
+    draw();
+    status.textContent = "";
+    try {
+      if (isDemo) {
+        direction = newDirection;
+        demoVotes[post.id] = direction;
+        writeSession("demo-votes", demoVotes);
+        score = (post.score || 0) + direction;
+        status.textContent = "演示投票已记录。";
+      } else {
+        await api("/posts/" + post.id + "/vote", {
+          method: "POST", body: { Direction: newDirection }, auth: true
+        });
+        if (version !== detailVersion) return;
+        direction = newDirection;
+        status.textContent = "投票已提交，净得分由后台异步更新。";
+        const refresh = ++voteRefreshVersion;
+        refreshAfterVote(refresh);
+      }
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      submitting = false;
+      draw();
+    }
+  }
+  async function refreshAfterVote(refreshVersion) {
+    for (const wait of [450, 800, 1500]) {
+      await new Promise((resolve) => setTimeout(resolve, wait));
+      if (refreshVersion !== voteRefreshVersion || version !== detailVersion || !session) return;
+      try {
+        const next = await readScore();
+        if (refreshVersion !== voteRefreshVersion || version !== detailVersion) return;
+        score = next;
+        draw();
+      } catch {
+        // The manual refresh remains available if background reads fail.
+      }
+    }
+  }
+  up.addEventListener("click", () => vote(1));
+  down.addEventListener("click", () => vote(-1));
+  refresh.addEventListener("click", async () => {
+    voteRefreshVersion++;
+    try {
+      score = await readScore();
+      if (version === detailVersion) {
+        status.textContent = "已读取当前净得分。";
+        draw();
+      }
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  });
+  draw();
+  loadVote();
+  return box;
+}
+async function renderPost(id, version) {
+  const panel = $("post-detail");
+  panel.replaceChildren(node("p", "muted", "正在加载帖子…"));
+  try {
+    const post = isDemo ? demoPosts.find((item) => item.id === id) :
+      normalizePost((await api("/posts/" + id)).info);
+    if (version !== detailVersion) return;
+    if (!post) throw new Error("没有找到这篇帖子。");
+    panel.replaceChildren(node("h1", "", post.title), makeMeta(post),
+      node("p", "body-copy", post.content), votePanel(post, version));
+  } catch (error) {
+    if (version === detailVersion) panel.replaceChildren(node("h1", "", "无法打开帖子"), node("p", "error", error.message));
+  }
+}
+
+async function consumeEvents(response, onEvent) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let event = "message";
+  let data = [];
+  function line(part) {
+    if (part === "") {
+      if (data.length) onEvent(event, data.join("\n"));
+      event = "message";
+      data = [];
+      return;
+    }
+    if (part.startsWith(":")) return;
+    const colon = part.indexOf(":");
+    const key = colon < 0 ? part : part.slice(0, colon);
+    const value = colon < 0 ? "" : part.slice(colon + 1).replace(/^ /, "");
+    if (key === "event") event = value;
+    if (key === "data") data.push(value);
+  }
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop();
+      for (const part of lines) line(part);
+      if (chunk.done) break;
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
+}
+function showSources(sources) {
+  $("sources").replaceChildren();
+  const seen = new Set();
+  for (const source of sources) {
+    const id = cleanID(source?.post_id);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const link = node("a", "", source.title || "帖子 #" + id);
+    link.href = "#post/" + id;
+    const item = node("li");
+    item.append(link);
+    $("sources").append(item);
+  }
+  $("sources-box").hidden = seen.size === 0;
+}
+$("chat-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (chatController) return;
+  const message = $("question").value.trim();
+  if (!message) { $("chat-error").textContent = "请输入要搜索的问题。"; return; }
+  if (!isDemo && !requireLogin()) return;
+  $("chat-error").textContent = "";
+  $("answer-box").hidden = false;
+  $("answer-text").textContent = "";
+  $("answer-status").textContent = "正在搜索相关帖子…";
+  showSources([]);
+  if (isDemo) {
+    const terms = [
+      /redis|缓存|重建|总分/i, /worker|租约|任务|并发/i,
+      /rag|agent|milvus|引用|出处/i, /k6|压测|积压|吞吐/i
+    ];
+    const ids = samplePosts.map((_, index) => 101 + index).filter((_, index) => terms[index].test(message));
+    const matches = samplePosts.filter((post) => ids.includes(Number(post.id)));
+    $("answer-text").textContent = matches.length ? matches.map((post) => post.content.split("\n\n")[0]).join("\n\n") :
+      "本地演示中没有找到对应的示例。试试 Redis、Worker、RAG 或 k6。";
+    showSources(matches.map((post) => ({ post_id: post.id, title: post.title })));
+    $("answer-status").textContent = "演示回答";
+    return;
+  }
+
+  const controller = new AbortController();
+  chatController = controller;
+  $("chat-send").disabled = true;
+  $("chat-stop").hidden = false;
+  let finished = false;
+  try {
+    const response = await api("/agent/chat", {
+      method: "POST", body: { message }, auth: true, signal: controller.signal, stream: true
+    });
+    await consumeEvents(response, (event, data) => {
+      if (event === "chunk") {
+        $("answer-status").textContent = "正在生成…";
+        $("answer-text").append(document.createTextNode(data));
+      } else if (event === "source") {
+        const sources = JSON.parse(data);
+        showSources(Array.isArray(sources) ? sources : []);
+        finished = true;
+      } else if (event === "error") {
+        throw new Error(data || "回答中断，请重试。");
+      }
+    });
+    if (!finished) throw new Error("连接提前中断，请重试。");
+    $("answer-status").textContent = $("answer-text").textContent ? "回答完成" : "本次未返回正文。";
+  } catch (error) {
+    $("answer-status").textContent = error.name === "AbortError" ? "已停止回答。" : "";
+    if (error.name !== "AbortError") $("chat-error").textContent = error.message;
+  } finally {
+    chatController = null;
+    $("chat-send").disabled = false;
+    $("chat-stop").hidden = true;
+  }
+});
+$("chat-stop").addEventListener("click", () => chatController?.abort());
+for (const question of exampleQuestions) {
+  const button = node("button", "suggestion");
+  button.type = "button";
+  button.innerHTML = svg("spark");
+  button.append(document.createTextNode(question));
+  button.addEventListener("click", () => {
+    $("question").value = question;
+    location.hash = "#agent";
+    setTimeout(() => $("question").focus(), 0);
+  });
+  $("suggestions").append(button);
+}
+
+function renderRoute() {
+  const hash = location.hash;
+  const agent = hash === "#agent";
+  const detail = hash.startsWith("#post/");
+  const forum = !agent && !detail;
+  const version = ++detailVersion;
+  $("forum-view").hidden = !forum;
+  $("post-view").hidden = !detail;
+  $("agent-view").hidden = !agent;
+  $("nav-forum").toggleAttribute("aria-current", !agent);
+  if (!agent) {
+    $("nav-forum").setAttribute("aria-current", "page");
+    chatController?.abort();
+  }
+  $("nav-agent").toggleAttribute("aria-current", agent);
+  if (agent) $("nav-agent").setAttribute("aria-current", "page");
+  if (forum) renderFeed();
+  if (detail) {
+    const id = cleanID(hash.slice("#post/".length));
+    if (id) renderPost(id, version);
+    else $("post-detail").replaceChildren(node("p", "error", "帖子 ID 无效。"));
+  }
+  document.title = (agent ? "AI 搜帖" : detail ? "帖子详情" : "技术社区") + " · Post Agent";
+}
+$("mode-switch").addEventListener("click", () => {
+  const url = new URL(location.href);
+  url.searchParams.set("mode", isDemo ? "live" : "demo");
+  url.hash = "forum";
+  location.assign(url.href);
+});
+window.addEventListener("hashchange", () => { renderRoute(); window.scrollTo(0, 0); });
+$("mode-label").textContent = isDemo ? "演示模式 · 示例数据" : "后端模式";
+$("mode-switch").textContent = isDemo ? "切换到后端模式" : "查看离线演示";
+$("mode-switch").hidden = standalone;
+$("chat-info").textContent = isDemo ? "示例回答来自本地演示帖子。" : "提问后会显示回答，并附上可打开的参考帖子。";
+saveAuth(session);
+renderRoute();
+</script>
+</body>
+</html>

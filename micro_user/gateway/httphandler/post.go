@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel"
 )
 
 type PostHandler struct {
@@ -101,6 +102,10 @@ func (p *PostHandler) SearchPosts(c *gin.Context) {
 func (p *PostHandler) VotePost(c *gin.Context) { // 只需要userid 不需要getprofile中的username(以此为优化点)
 	// 取出公用的2s上下文
 	ctx := c.Request.Context()
+
+	// 追踪链路
+	tracer := otel.Tracer("gateway_vote")
+
 	post_id := c.Param("id") // 收到路径参数(postid)
 	i := new(model.Direction)
 	err := c.ShouldBindJSON(i) // 收到json内容(点赞还是踩)
@@ -122,7 +127,10 @@ func (p *PostHandler) VotePost(c *gin.Context) { // 只需要userid 不需要get
 		return
 	}
 	// 检查post是否存在
-	_, err = dao.GetPostByID(ctx, pid) // 耗时点02(查存)
+	// 追踪
+	lookupCtx, lookupSpan := tracer.Start(ctx, "vote.post_lookup") // dao层
+	_, err = dao.GetPostByID(lookupCtx, pid)                       // 耗时点02(查存)	这里将父span传入,用于后续计时
+	lookupSpan.End()                                               // end到函数头部之间耗时被记录
 	if errors.Is(err, context.DeadlineExceeded) {
 		log.Printf("获取post信息超时,上下文关闭,%v", err)
 		c.JSON(http.StatusGatewayTimeout, gin.H{"msg": "上下文超时关闭"})
@@ -138,7 +146,12 @@ func (p *PostHandler) VotePost(c *gin.Context) { // 只需要userid 不需要get
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": "服务繁忙"})
 		return
 	}
-	err = service.VotePostByID(ctx, int_uid, pid, i.Direction) // 耗时点03(写入票数,包括其中的dao层操作)
+
+	// 开始计时
+	lookupCtx, lookupSpan = tracer.Start(ctx, "vote.post_vote")
+
+	err = service.VotePostByID(lookupCtx, int_uid, pid, i.Direction) // 耗时点03(写入票数,包括其中的dao层操作)
+	lookupSpan.End()                                                 // 耗时
 	if errors.Is(err, context.DeadlineExceeded) {
 		log.Printf("投票处理超时,上下文关闭,:%v", err)
 		c.JSON(http.StatusGatewayTimeout, gin.H{"msg": "上下文超时关闭"})
@@ -181,4 +194,88 @@ func (p *PostHandler) VoteTiming() gin.HandlerFunc {
 
 		c.Next() // 执行后续的鉴权和handle(统计总时长)
 	}
+}
+
+// 获取当前用户的点赞情况
+func (p *PostHandler) GetScoreByID(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+	pid := c.Param("pid")
+	postid, err := strconv.ParseInt(pid, 10, 64)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"msg": "参数格式错误"})
+		return
+	}
+	if postid <= 0 {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"msg": "检查postid,必须大于0"})
+		return
+	}
+	//查存
+	_, err = dao.GetPostByID(ctx, postid)
+	switch {
+	case errors.Is(err, dao.ErrPostNotExist):
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"msg": "帖子不存在"})
+		return
+	case errors.Is(err, context.DeadlineExceeded):
+		c.AbortWithStatusJSON(http.StatusGatewayTimeout, gin.H{"msg": "查询超时"})
+		return
+	case err != nil:
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"msg": "查询失败"})
+		return
+	}
+	//	根据pid获取post总分数
+	score, err := service.GetScoreByID(ctx, postid)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"msg": "获取帖子总点赞失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"vote_num": score,
+	})
+}
+
+// 查询当前用户当前查询的post的投票情况
+func (p *PostHandler) GetMyVote(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+	pid := c.Param("pid")
+	postid, err := strconv.ParseInt(pid, 10, 64)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"msg": "参数格式错误"})
+		return
+	}
+	if postid <= 0 {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"msg": "检查postid,必须大于0"})
+		return
+	}
+	// 查存
+	_, err = dao.GetPostByID(ctx, postid)
+	switch {
+	case errors.Is(err, dao.ErrPostNotExist):
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"msg": "帖子不存在"})
+		return
+	case errors.Is(err, context.DeadlineExceeded):
+		c.AbortWithStatusJSON(http.StatusGatewayTimeout, gin.H{"msg": "查询超时"})
+		return
+	case err != nil:
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"msg": "查询失败"})
+		return
+	}
+
+	// 获取当前用户uid
+	uid, ok := c.Get("user_id")
+	if !ok { // 500(服务异常)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"msg": "没有查到相关信息"})
+		return
+	}
+	// 查询vote
+	score, err := service.GetScoreNow(ctx, uid.(int64), postid)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"msg": "获取帖子点赞数失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"direction": score,
+	})
+
 }
