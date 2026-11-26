@@ -15,7 +15,7 @@ import (
 
 // 选择导出方式(将采集到的数据发送到外部)
 func newExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
-	exporter, err := otlptracegrpc.New(ctx)
+	exporter, err := otlptracegrpc.New(ctx) // 从env中读取配置OTEL_EXPORTER_OTLP_TRACES_ENDPOIN()
 	if err != nil {
 		log.Printf("创建Exporter失败:%v", err)
 		return nil, err
