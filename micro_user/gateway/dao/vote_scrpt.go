@@ -39,20 +39,26 @@ if not currentVoteScore then
     return redis.error_reply('` + voteScoreCacheMiss + `')
 end
 
+-- 判断是否有旧版本但没有旧方向(direction数据消失)
+local rawOldVersion = redis.call('HGET', KEYS[3], ARGV[1])
+local rawOldDirection = redis.call('ZSCORE', KEYS[1], ARGV[1])
+
+if rawOldVersion and not rawOldDirection then
+    redis.call('ZREM', KEYS[2], ARGV[2])
+    return redis.error_reply('` + voteScoreCacheMiss + `')
+end
+
+local oldVersion = rawOldVersion or '0'
+-- 这里保留原来的版本比较
+local oldDirection = tonumber(rawOldDirection or '0')
+
 local newVersion = ARGV[4]
--- 拿出此时在hash表中的动作版本(旧的)
-local oldVersion = redis.call('HGET',KEYS[3],ARGV[1]) or '0'    
 
 if #newVersion < #oldVersion or
     (#newVersion == #oldVersion and newVersion <= oldVersion) then
     return 0
 end
 
-
--- 查询旧方向，没有记录时按 0 处理。
-local oldDirection = tonumber(
-    redis.call('ZSCORE', KEYS[1], ARGV[1]) or '0'
-)
 
 if oldDirection ~= 0 and oldDirection ~= 1 and oldDirection ~= -1 then
     return redis.error_reply('invalid stored vote direction')
