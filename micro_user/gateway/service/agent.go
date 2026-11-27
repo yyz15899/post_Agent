@@ -9,6 +9,7 @@ import (
 	"micro_user/gateway/dao"
 	"micro_user/gateway/llm"
 	Model "micro_user/gateway/model"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -60,6 +61,8 @@ func AgentChat(ctx context.Context, message *schema.Message, r *milvusRetriever.
 	sources := []PostSource{}         // 存储来源信息
 	seen := make(map[string]struct{}) // 用于去重
 
+	citedIDs := make(map[string]bool)
+
 	onDocs := func(docs []*schema.Document) {
 		Mutex.Lock()
 		defer Mutex.Unlock()
@@ -93,6 +96,8 @@ func AgentChat(ctx context.Context, message *schema.Message, r *milvusRetriever.
 	ToolInfo1 := NewSearchPostTool(r, onDocs)
 	ToolInfo2 := NewGetPostTool(r, onPost)
 
+	var postRefRE = regexp.MustCompile(`\[post:([0-9]+)\]`)
+	var answer strings.Builder
 	cfg := &react.AgentConfig{
 		ToolCallingModel: model,
 		ToolsConfig: compose.ToolsNodeConfig{
@@ -119,6 +124,7 @@ func AgentChat(ctx context.Context, message *schema.Message, r *milvusRetriever.
 					if err := onChunk(chunk.Content); err != nil {
 						return false, err
 					}
+					answer.WriteString(chunk.Content) // 将string拼接进answer中
 				}
 				// 当模型先输出正文后输出toolcalls时,换成下述
 				// if chunk.Content != "" { // 遇到正文就返回(firstLineOfDefence) 这里需要确保是先返回toolcalls 后返回正文
@@ -143,8 +149,9 @@ func AgentChat(ctx context.Context, message *schema.Message, r *milvusRetriever.
 	//将用户单条信息组织为切片
 	msg := []*schema.Message{
 		{
-			Role:    schema.System,
-			Content: "你是本站的一个智能Agent 用于帮助用户根据输入的信息找到相关帖子,如果工具返回空结果，明确告知本次未找到匹配帖子，不要编造；没有必要时不要反复搜索",
+			Role: schema.System,
+			Content: `你是本站的一个智能Agent 用于帮助用户根据输入的信息找到相关帖子,如果工具返回空结果，明确告知本次未找到匹配帖子，不要编造；没有必要时不要反复搜索,
+			最终回答使用了某篇帖子时，在对应句子末尾加上 [post:<post_id>]，其中 <post_id> 使用本轮工具返回的帖子 ID。说明某篇帖子没有提供某项信息时，也可以引用该帖。如果没有用到任何帖子，就省略引用标记。`,
 		}, {
 			Role:    message.Role,
 			Content: message.Content,
@@ -168,7 +175,18 @@ func AgentChat(ctx context.Context, message *schema.Message, r *milvusRetriever.
 			return nil, err
 		}
 	}
-	return sources, nil
+	resp := answer.String() // 获取模型完整回答
+	// 在流接收完成后执行  先选出模型最终的回答依据
+	for _, match := range postRefRE.FindAllStringSubmatch(resp, -1) {
+		citedIDs[match[1]] = true // 标记回答时的实际依据postid
+	}
+	citedSourse := []PostSource{}
+	for _, source := range sources {
+		if citedIDs[fmt.Sprint(source.Postid)] { // 判断是否存在
+			citedSourse = append(citedSourse, source)
+		}
+	}
+	return citedSourse, nil
 }
 
 // 根据用户帖子找到相近语义的数据
@@ -178,6 +196,9 @@ func NewSearchPostTool(r *milvusRetriever.Retriever, onDocs func([]*schema.Docum
 		docs, err := r.Retrieve(ctx, req.Keyword)
 		if err != nil {
 			return nil, err
+		}
+		for i, doc := range docs {
+			fmt.Printf("第%v篇帖子引用%v,标题为%v", i, doc.MetaData["post_id"], doc.MetaData["title"])
 		}
 		onDocs(docs)
 		return docs, err
